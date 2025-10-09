@@ -1,0 +1,88 @@
+from PIL import Image, ImageDraw, ImageFont
+import os
+import random
+import glob
+
+# Directory to save synthetic images
+output_dir = "dataset"
+font_dir = "fonts"
+text_dir = "input/raw_text"
+os.makedirs(output_dir, exist_ok=True)
+
+# Read text from input file
+text_file_path = os.path.join(text_dir, "text.txt")
+with open(text_file_path, "r", encoding="utf-8") as f:
+    lines = f.readlines()
+
+# Filter out empty lines and strip whitespace
+texts = [line.strip() for line in lines if line.strip()]
+
+# Get all font files from fonts directory
+font_files = glob.glob(os.path.join(font_dir, "*.ttf"))
+if not font_files:
+    raise ValueError(f"No .ttf font files found in {font_dir} directory")
+
+print(f"Found {len(font_files)} font(s): {[os.path.basename(f) for f in font_files]}")
+
+# Tesseract LSTM best practices
+TARGET_TEXT_HEIGHT = 48  # Optimal text height for Tesseract (30-48px range)
+PADDING = 10  # Padding around text (minimum 5-10px recommended)
+
+
+# Find optimal font size to achieve target text height
+def get_optimal_font_size(font_path, sample_text, target_height):
+    """Calculate font size that produces text close to target height"""
+    font_size = 32
+    for size in range(20, 100):
+        test_font = ImageFont.truetype(font_path, size)
+        bbox = test_font.getbbox(sample_text)
+        text_height = bbox[3] - bbox[1]
+        if text_height >= target_height:
+            return size
+    return font_size
+
+
+for i, text in enumerate(texts):
+    # Randomly select a font for this image
+    selected_font_path = random.choice(font_files)
+    font_name = os.path.basename(selected_font_path)
+
+    # Calculate optimal font size for the selected font
+    optimal_font_size = get_optimal_font_size(
+        selected_font_path, text, TARGET_TEXT_HEIGHT
+    )
+    font = ImageFont.truetype(selected_font_path, optimal_font_size)
+
+    # Calculate image size based on text length
+    bbox = font.getbbox(text)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+
+    # Add padding (2x on each side for safety)
+    img_width = text_width + (PADDING * 2)
+    img_height = text_height + (PADDING * 2)
+
+    # Ensure minimum height for consistency
+    if img_height < TARGET_TEXT_HEIGHT + (PADDING * 2):
+        img_height = TARGET_TEXT_HEIGHT + (PADDING * 2)
+
+    # Create a white background image
+    img = Image.new("RGB", (img_width, img_height), color=(255, 255, 255))
+
+    # Draw text on image (center vertically if needed)
+    draw = ImageDraw.Draw(img)
+    y_offset = (img_height - text_height) // 2
+    draw.text((PADDING, y_offset), text, fill=(0, 0, 0), font=font)
+
+    # Save the image
+    img_path = os.path.join(output_dir, f"img_{i}.tif")
+    img.save(img_path)
+
+    # Save ground truth text file
+    gt_path = os.path.join(output_dir, f"img_{i}.gt.txt")
+    with open(gt_path, "w", encoding="utf-8") as gt_file:
+        gt_file.write(text)
+
+    print(
+        f"Saved {img_path} and {gt_path} (Font: {font_name}, Size: {optimal_font_size}px)"
+    )
