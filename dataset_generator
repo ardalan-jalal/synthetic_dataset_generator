@@ -155,10 +155,12 @@ def get_optimal_font_size(font_path, sample_text, target_height):
 for i in range(NUM_IMAGES):
     # Randomly select a line of text
     text = random.choice(texts)
+    text_index = texts.index(text)  # Get index of selected text
 
     # Randomly select a font for this image
     selected_font_path = random.choice(font_files)
     font_name = os.path.basename(selected_font_path)
+    font_index = font_to_index[selected_font_path]  # Get font index
 
     # Calculate optimal font size for the selected font
     optimal_font_size = get_optimal_font_size(
@@ -188,11 +190,14 @@ for i in range(NUM_IMAGES):
     y_offset = (img_height - text_height) // 2 - bbox[1]
     draw.text((PADDING, y_offset), text, fill=(0, 0, 0), font=font)
 
+    # Create filename with text index and font index
+    filename = f"t{text_index:04d}c01f{font_index:02d}"
+
     # Save the image
-    img_path = os.path.join(OUTPUT_DIR, f"img_{i}.tif")
+    img_path = os.path.join(OUTPUT_DIR, f"{filename}.tif")
     img.save(img_path, dpi=(300, 300))
 
     # Save ground truth text file
-    gt_path = os.path.join(OUTPUT_DIR, f"img_{i}.gt.txt")
+    gt_path = os.path.join(OUTPUT_DIR, f"{filename}.gt.txt")
     with open(gt_path, "w", encoding="utf-8") as gt_file:
         gt_file.write(text)
