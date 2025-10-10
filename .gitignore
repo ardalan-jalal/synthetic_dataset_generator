@@ -1,5 +1,6 @@
-# Generated dataset files
-dataset/
+# Generated dataset files - track folder but not contents
+dataset/*
+!dataset/.gitkeep
 
 # Python cache
 __pycache__/
@@ -31,5 +32,3 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
-
-dataset/*
