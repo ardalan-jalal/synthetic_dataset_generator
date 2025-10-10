@@ -2,6 +2,9 @@
 dataset/*
 !dataset/.gitkeep
 
+# Test samples folder
+test_samples/
+
 # Python cache
 __pycache__/
 *.py[cod]
