@@ -11,7 +11,8 @@ A Python tool for generating synthetic OCR training data optimized for Kurdish t
 - 🎨 **Multi-Font Support** - Automatically detects all fonts and creates diverse variations
 - 📝 **Dual Content Types** - Separate generators for regular text and special characters/numbers
 - 🔄 **Built-in Data Augmentation** - Configurable augmentation for scanned paper simulation
-- 📄 **Realistic Background Augmentation** - Paper textures, aging, scanner artifacts for real-world document simulation (NEW!)
+- 📄 **Realistic Background Augmentation** - Paper textures, aging, scanner artifacts for real-world document simulation
+- ⚙️ **YAML Configuration** - Easy configuration without code editing (NEW!)
 
 ### Technical Features
 - ⚡ **Tesseract LSTM Optimized** - 32px text height, proper padding, sentence-aware splitting
@@ -24,29 +25,42 @@ A Python tool for generating synthetic OCR training data optimized for Kurdish t
 
 ```
 Synthatic_ocr_data_generator/
-├── dataset/                    # Generated images (auto-created)
-│   ├── t0000c01f03.tif        # Text image (sequential, font 3)
-│   ├── t0000c01f03.gt.txt     # Ground truth text
-│   ├── s0000c01f05.tif        # Special char image (sequential, font 5)
-│   ├── s0000c01f05.gt.txt     # Ground truth
-│   └── ...
-├── fonts/                      # Place your font files here
+├── main.py                    # Main controller (run this!)
+├── requirements.txt           # Python dependencies
+├── README.md                  # This file
+│
+├── src/                       # Source code modules
+│   ├── text_generator.py
+│   ├── special_generator.py
+│   ├── background_augmentation.py
+│   └── config_loader.py
+│
+├── config/                    # Configuration files
+│   ├── config.yaml           # Main config (edit this!)
+│   └── CONFIG_GUIDE.md       # Configuration guide
+│
+├── docs/                      # Documentation
+│   └── BACKGROUND_AUGMENTATION_GUIDE.md
+│
+├── fonts/                     # Place your font files here
 │   ├── k24_regular.ttf
 │   ├── nrt_regular.ttf
 │   ├── rudaw_regular.ttf
 │   ├── unikurd_hejar_regular.ttf
+│   ├── font_index.json       # Auto-generated font mapping
 │   └── ...
-├── input/
+│
+├── input/                     # Input text files
 │   └── raw_text/
-│       ├── text.txt           # Kurdish text samples (714 lines)
-│       └── special.txt        # Numbers and symbols (366 lines)
-├── main.py                    # Main controller (run this!)
-├── text_generator.py          # Text-only generator
-├── special_generator.py       # Special chars generator
-├── background_augmentation.py # Realistic background effects module
-├── font_index.json            # Auto-generated font mapping
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+│       ├── text.txt          # Kurdish text samples (714 lines)
+│       └── special.txt       # Numbers and symbols (366 lines)
+│
+└── dataset/                   # Generated images (auto-created)
+    ├── t0000c01f03.tif       # Text image (sequential, font 3)
+    ├── t0000c01f03.gt.txt    # Ground truth text
+    ├── s0000c01f05.tif       # Special char image (sequential, font 5)
+    ├── s0000c01f05.gt.txt    # Ground truth
+    └── ...
 ```
 
 ## 🚀 Quick Start
@@ -65,6 +79,7 @@ pip install -r requirements.txt
 - Python 3.6+
 - Pillow (PIL) 10.0.0+
 - NumPy 1.21.0+ (for data augmentation)
+- PyYAML 6.0+ (for configuration)
 
 ### 2. Add Your Fonts
 
@@ -81,20 +96,44 @@ The generator automatically detects all fonts. **Recommended: 3-14 fonts** for o
 
 ### 3. Configure Generation
 
-Edit `main.py` (only 2 settings!):
+**YAML Configuration System** 🎉
 
-```python
-# ============================================================================
-# SIMPLE CONFIGURATION
-# ============================================================================
-TOTAL_SAMPLES = 500        # Total number of images to generate
-TEXT_PERCENTAGE = 80       # Percentage for text.txt (rest → special.txt)
-# ============================================================================
+All settings are in `config/config.yaml` - no code editing needed!
+
+Edit `config/config.yaml`:
+
+```yaml
+dataset:
+  total_samples: 5000        # Total number of images to generate
+  text_percentage: 85        # Percentage for text.txt (rest → special.txt)
+
+augmentation:
+  percentage: 40             # Percentage to augment (0-100)
+
+background:
+  percentage: 70             # Percentage with realistic backgrounds
+  intensity: "medium"        # light, medium, or heavy
 ```
 
-**Examples:**
-- `TOTAL_SAMPLES = 500, TEXT_PERCENTAGE = 80` → 400 text + 100 special images
-- `TOTAL_SAMPLES = 3000, TEXT_PERCENTAGE = 85` → 2550 text + 450 special images
+**Example configurations:**
+
+```yaml
+# Quick testing
+dataset:
+  total_samples: 100
+  
+# Production scale
+dataset:
+  total_samples: 10000
+  
+# Clean digital text (no augmentation)
+augmentation:
+  percentage: 0
+background:
+  percentage: 0
+```
+
+See `config/CONFIG_GUIDE.md` for all options!
 
 ### 4. Generate Dataset
 
@@ -105,8 +144,8 @@ python main.py
 
 **Or run generators individually:**
 ```bash
-python text_generator.py      # Only text images
-python special_generator.py   # Only special char images
+python src/text_generator.py      # Only text images
+python src/special_generator.py   # Only special char images
 ```
 
 ## 📊 Dataset Composition
@@ -194,7 +233,7 @@ s0000c01f02.tif  → Special image #0, Font 2
 s0001c01f05.tif  → Special image #1, Font 5
 ```
 
-**Font mapping** in `font_index.json`:
+**Font mapping** in `fonts/font_index.json`:
 ```json
 {
   "f01": {
@@ -212,7 +251,7 @@ s0001c01f05.tif  → Special image #1, Font 5
 
 ### Individual Generators
 
-Each generator (`text_generator.py` and `special_generator.py`) can be customized:
+Each generator (`src/text_generator.py` and `src/special_generator.py`) can be customized:
 
 ```python
 # Number of images to generate
@@ -454,21 +493,23 @@ Output: 4250 text + 750 special images (~4-6 minutes)
 
 ### Example 3: Text-Only Generation
 ```bash
-# Edit text_generator.py
-NUM_IMAGES = 1000
+# Edit config/config.yaml
+dataset:
+  total_samples: 1000
 
 # Run
-python text_generator.py
+python src/text_generator.py
 ```
 Output: 1000 text images only
 
 ### Example 4: Special Characters Focus
 ```bash
-# Edit special_generator.py
-NUM_IMAGES = 500
+# Edit config/config.yaml
+dataset:
+  total_samples: 500
 
 # Run
-python special_generator.py
+python src/special_generator.py
 ```
 Output: 500 special character images only
 

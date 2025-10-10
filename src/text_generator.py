@@ -5,32 +5,39 @@ import glob
 import re
 import json
 import numpy as np
-from background_augmentation import apply_realistic_background
+import sys
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.background_augmentation import apply_realistic_background
+from src.config_loader import get_config
+
+# Load configuration from YAML
+config = get_config()
 
 # Seed random for better randomization across runs
-random.seed()
+if config.advanced.random_seed is not None:
+    random.seed(config.advanced.random_seed)
+else:
+    random.seed()
 
-# Directory to save synthetic images
-OUTPUT_DIR = "dataset"
-FONT_DIR = "fonts"
+# Directory paths from config
+OUTPUT_DIR = config.dataset.output_dir
+FONT_DIR = config.fonts.directory
 TEXT_DIR = "input/raw_text"
 
-# Number of images to generate
-NUM_IMAGES = 100  # Set this to control how many images you want to generate
+# Number of images to generate (can be overridden by main.py)
+NUM_IMAGES = 100
 
-# Maximum characters per line Lines longer than this will be split
-MAX_LINE_LENGTH = 100
-
-# AUGMENTATION CONTROL
-AUGMENTATION_PERCENTAGE = 50  # Percentage of images to augment (0-100)
-# Recommended: 30% for mixed quality (scans + screenshots), 0% for clean only, 50% for heavy variance
-
-# BACKGROUND AUGMENTATION CONTROL
-BACKGROUND_AUGMENTATION_PERCENTAGE = (
-    70  # Percentage of images to get realistic backgrounds (0-100)
-)
-# Recommended: 70% for realistic scanned documents, 0% for clean white backgrounds
-BACKGROUND_INTENSITY = "medium"  # Options: 'light', 'medium', 'heavy'
+# Configuration from YAML
+MAX_LINE_LENGTH = config.text_processing.max_line_length_text
+AUGMENTATION_PERCENTAGE = config.augmentation.percentage
+BACKGROUND_AUGMENTATION_PERCENTAGE = config.background.percentage
+BACKGROUND_INTENSITY = config.background.intensity
+TARGET_TEXT_HEIGHT = config.fonts.target_text_height
+PADDING = config.fonts.padding
+PROGRESS_INTERVAL = config.output.progress_interval
 
 
 # Split long lines into manageable chunks for better training
@@ -210,8 +217,8 @@ font_mapping = {
     for font_path, idx in font_to_index.items()
 }
 
-# Save font index to JSON file
-font_index_file = os.path.join("font_index.json")
+# Save font index to JSON file in fonts directory
+font_index_file = os.path.join(FONT_DIR, "font_index.json")
 with open(font_index_file, "w", encoding="utf-8") as f:
     json.dump(font_mapping, f, indent=2, ensure_ascii=False)
 
@@ -219,10 +226,6 @@ with open(font_index_file, "w", encoding="utf-8") as f:
 if not font_files:
     raise ValueError(f"No .ttf or .otf font files found in {FONT_DIR} directory")
 print(f"Found {len(font_files)} fonts: {[os.path.basename(f) for f in font_files]}")
-
-# Tesseract LSTM best practices
-TARGET_TEXT_HEIGHT = 32  # Optimal text height for Tesseract (30-33px recommended)
-PADDING = 10  # Padding around text (minimum 5-10px recommended)
 
 
 # Find optimal font size to achieve target text height
@@ -324,5 +327,5 @@ while i < NUM_IMAGES and attempts < max_attempts:
     # Increment counter only after successful generation
     i += 1
     # Progress indicator
-    if i % 50 == 0:
+    if i % PROGRESS_INTERVAL == 0:
         print(f"Generated {i}/{NUM_IMAGES} text images...")
