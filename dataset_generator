@@ -11,7 +11,7 @@ TEXT_DIR = "input/raw_text"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Number of images to generate
-NUM_IMAGES = 15  # Set this to control how many images you want to generate
+NUM_IMAGES = 100  # Set this to control how many images you want to generate
 
 # Maximum characters per line Lines longer than this will be split
 MAX_LINE_LENGTH = 80  
