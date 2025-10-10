@@ -5,20 +5,23 @@ import glob
 import re
 import json
 
+# Seed random for better randomization across runs
+random.seed()
+
 # Directory to save synthetic images
 OUTPUT_DIR = "dataset"
 FONT_DIR = "fonts"
 TEXT_DIR = "input/raw_text"
 
 # Number of images to generate
-NUM_IMAGES = 10  # Set this to control how many images you want to generate
+NUM_IMAGES = 100  # Set this to control how many images you want to generate
 
 # Maximum characters per line Lines longer than this will be split
 MAX_LINE_LENGTH = 100
 
 
 # Split long lines into manageable chunks for better training
-def split_long_lines(text, max_length=150):
+def split_long_lines(text, max_length=100):
     """Split text into chunks at sentence boundaries for realistic line lengths"""
     if len(text) <= max_length:
         return [text]
@@ -151,16 +154,34 @@ def get_optimal_font_size(font_path, sample_text, target_height):
     return font_size
 
 
-# Generate images
-for i in range(NUM_IMAGES):
-    # Randomly select a line of text
-    text = random.choice(texts)
-    text_index = texts.index(text)  # Get index of selected text
+# Generate images - shuffle texts for better distribution
+shuffled_indices = list(range(len(texts)))
+random.shuffle(shuffled_indices)  # Randomize order
+
+# Track combinations to prevent duplicates (same text + same font)
+generated_combinations = set()
+i = 0
+attempts = 0
+max_attempts = NUM_IMAGES * 100  # Safety limit
+
+while i < NUM_IMAGES and attempts < max_attempts:
+    # Pick from shuffled list (no duplicates until all texts are used)
+    text_index = shuffled_indices[i % len(texts)]
+    text = texts[text_index]
 
     # Randomly select a font for this image
     selected_font_path = random.choice(font_files)
     font_name = os.path.basename(selected_font_path)
     font_index = font_to_index[selected_font_path]  # Get font index
+
+    # Check if this exact combination (text + font) already exists
+    combination = (text_index, font_index)
+    if combination in generated_combinations:
+        attempts += 1
+        continue  # Skip this duplicate and try again
+
+    # Mark this combination as used
+    generated_combinations.add(combination)
 
     # Calculate optimal font size for the selected font
     optimal_font_size = get_optimal_font_size(
@@ -190,8 +211,8 @@ for i in range(NUM_IMAGES):
     y_offset = (img_height - text_height) // 2 - bbox[1]
     draw.text((PADDING, y_offset), text, fill=(0, 0, 0), font=font)
 
-    # Create filename with text index and font index
-    filename = f"t{text_index:04d}c01f{font_index:02d}"
+    # Create filename with unique counter to avoid overwrites
+    filename = f"t{i:04d}c01f{font_index:02d}"
 
     # Save the image
     img_path = os.path.join(OUTPUT_DIR, f"{filename}.tif")
@@ -201,3 +222,9 @@ for i in range(NUM_IMAGES):
     gt_path = os.path.join(OUTPUT_DIR, f"{filename}.gt.txt")
     with open(gt_path, "w", encoding="utf-8") as gt_file:
         gt_file.write(text)
+
+    # Increment counter only after successful generation
+    i += 1
+    # Progress indicator
+    if i % 50 == 0:
+        print(f"Generated {i}/{NUM_IMAGES} text images...")
