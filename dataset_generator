@@ -8,13 +8,12 @@ import re
 OUTPUT_DIR = "dataset"
 FONT_DIR = "fonts"
 TEXT_DIR = "input/raw_text"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Number of images to generate
-NUM_IMAGES = 100  # Set this to control how many images you want to generate
+NUM_IMAGES = 10  # Set this to control how many images you want to generate
 
 # Maximum characters per line Lines longer than this will be split
-MAX_LINE_LENGTH = 80  
+MAX_LINE_LENGTH = 100
 
 # Split long lines into manageable chunks for better training
 def split_long_lines(text, max_length=150):
@@ -22,34 +21,70 @@ def split_long_lines(text, max_length=150):
     if len(text) <= max_length:
         return [text]
 
-    # Split on common sentence boundaries (period, comma, semicolon, etc.)
+    # Step 1: Try splitting on punctuation boundaries
     # Kurdish/Arabic punctuation: ، (comma), ؛ (semicolon), . ! ?
     sentences = re.split(r"([.!?،؛])\s+", text)
 
     chunks = []
     current_chunk = ""
 
-    for i, part in enumerate(sentences):
+    for part in sentences:
         # Check if it's a punctuation mark
         if part in ".!?،؛":
             current_chunk += part
         else:
             # If adding this would exceed max length, save current chunk
-            if current_chunk and len(current_chunk) + len(part) > max_length:
+            if current_chunk and len(current_chunk) + len(part) + 1 > max_length:
                 chunks.append(current_chunk.strip())
                 current_chunk = part
             else:
-                current_chunk += part
+                current_chunk += (
+                    (" " + part)
+                    if current_chunk
+                    and not current_chunk.endswith((".", "!", "?", "،", "؛"))
+                    else part
+                )
 
     # Add the last chunk
     if current_chunk and current_chunk.strip():
         chunks.append(current_chunk.strip())
 
-    # If splitting didn't help, force split at max_length
-    if not chunks:
-        chunks = [text[i : i + max_length] for i in range(0, len(text), max_length)]
+    # Step 2: CRITICAL - Validate and force-split any chunk still exceeding max_length
+    final_chunks = []
+    for chunk in chunks:
+        if len(chunk) <= max_length:
+            final_chunks.append(chunk)
+        else:
+            # Split on word boundaries
+            words = chunk.split()
+            temp_line = ""
 
-    return chunks
+            for word in words:
+                # Check if adding this word would exceed limit
+                test_line = (temp_line + " " + word) if temp_line else word
+
+                if len(test_line) <= max_length:
+                    temp_line = test_line
+                else:
+                    # Save current line if it exists
+                    if temp_line:
+                        final_chunks.append(temp_line)
+                        temp_line = word
+                    else:
+                        # Single word exceeds max_length - hard split it
+                        final_chunks.append(word[:max_length])
+                        temp_line = word[max_length:]
+
+            # Don't forget the last line
+            if temp_line:
+                final_chunks.append(temp_line)
+
+    # Fallback: if somehow still empty, hard split original text
+    return (
+        final_chunks
+        if final_chunks
+        else [text[i : i + max_length] for i in range(0, len(text), max_length)]
+    )
 
 
 # Read text from input file
@@ -65,12 +100,15 @@ texts = []
 for text in raw_texts:
     texts.extend(split_long_lines(text, MAX_LINE_LENGTH))
 
-print(f"Original lines: {len(raw_texts)}, After splitting long lines: {len(texts)}")
-
 # Get all font files from fonts directory
-font_files = glob.glob(os.path.join(FONT_DIR, "*.ttf"))
+font_files = (
+    glob.glob(os.path.join(FONT_DIR, "*.ttf"))
+    + glob.glob(os.path.join(FONT_DIR, "*.TTF"))
+    + glob.glob(os.path.join(FONT_DIR, "*.otf"))
+)
 if not font_files:
-    raise ValueError(f"No .ttf font files found in {FONT_DIR} directory")
+    raise ValueError(f"No .ttf or .otf font files found in {FONT_DIR} directory")
+print(f"Found {len(font_files)} fonts: {[os.path.basename(f) for f in font_files]}")
 
 # Tesseract LSTM best practices
 TARGET_TEXT_HEIGHT = 32  # Optimal text height for Tesseract (30-33px recommended)
@@ -89,7 +127,7 @@ def get_optimal_font_size(font_path, sample_text, target_height):
             return size
     return font_size
 
-
+# Generate images
 for i in range(NUM_IMAGES):
     # Randomly select a line of text
     text = random.choice(texts)
