@@ -3,6 +3,7 @@ import os
 import random
 import glob
 import re
+import json
 
 # Directory to save synthetic images
 OUTPUT_DIR = "dataset"
@@ -14,6 +15,7 @@ NUM_IMAGES = 10  # Set this to control how many images you want to generate
 
 # Maximum characters per line Lines longer than this will be split
 MAX_LINE_LENGTH = 100
+
 
 # Split long lines into manageable chunks for better training
 def split_long_lines(text, max_length=150):
@@ -106,6 +108,27 @@ font_files = (
     + glob.glob(os.path.join(FONT_DIR, "*.TTF"))
     + glob.glob(os.path.join(FONT_DIR, "*.otf"))
 )
+# Sort fonts alphabetically for consistent indexing
+font_files = sorted(font_files)
+
+# Create font-to-index mapping (1-based)
+font_to_index = {font_path: idx + 1 for idx, font_path in enumerate(font_files)}
+
+# Prepare font mapping for JSON
+font_mapping = {
+    f"f{idx:02d}": {
+        "font_file": os.path.basename(font_path),
+        "index": idx,
+    }
+    for font_path, idx in font_to_index.items()
+}
+
+# Save font index to JSON file
+font_index_file = os.path.join("font_index.json")
+with open(font_index_file, "w", encoding="utf-8") as f:
+    json.dump(font_mapping, f, indent=2, ensure_ascii=False)
+
+
 if not font_files:
     raise ValueError(f"No .ttf or .otf font files found in {FONT_DIR} directory")
 print(f"Found {len(font_files)} fonts: {[os.path.basename(f) for f in font_files]}")
@@ -126,6 +149,7 @@ def get_optimal_font_size(font_path, sample_text, target_height):
         if text_height >= target_height:
             return size
     return font_size
+
 
 # Generate images
 for i in range(NUM_IMAGES):
