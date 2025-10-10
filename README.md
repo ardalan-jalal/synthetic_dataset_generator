@@ -67,19 +67,37 @@ Synthatic_ocr_data_generator/
 
 ### 1. Installation
 
+**Requirements:**
+- **Python 3.10.13** (recommended)
+- Pillow (PIL) 10.0.0+
+- NumPy 1.21.0+
+- PyYAML 6.0+
+
+**Step 1: Setup Python Environment**
+
 ```bash
-# Clone or download this repository
+# Navigate to project directory
 cd Synthatic_ocr_data_generator
 
-# Install dependencies
+# Create virtual environment (recommended)
+python3.10 -m venv .venv
+
+# Activate virtual environment
+# On macOS/Linux:
+source .venv/bin/activate
+
+# On Windows:
+.venv\Scripts\activate
+```
+
+**Step 2: Install Dependencies**
+
+```bash
+# Install required packages
 pip install -r requirements.txt
 ```
 
-**Requirements:**
-- Python 3.6+
-- Pillow (PIL) 10.0.0+
-- NumPy 1.21.0+ (for data augmentation)
-- PyYAML 6.0+ (for configuration)
+**Note:** Using a virtual environment (`.venv`) keeps dependencies isolated and prevents conflicts with other projects.
 
 ### 2. Add Your Fonts
 
