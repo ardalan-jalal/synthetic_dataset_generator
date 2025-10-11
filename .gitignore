@@ -5,6 +5,10 @@ dataset/*
 # Generated font index
 fonts/font_index.json
 
+# Generated log files
+logs/
+!logs/.gitkeep
+
 # Test samples folder
 test_samples/
 test_rotation_fix/

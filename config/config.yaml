@@ -6,8 +6,12 @@
 
 dataset:
   total_samples: 100          # Large production dataset
-  text_percentage: 85           # 85% text, 15% special chars (OCR best practice)
+  text_percentage: 80           # 85% text, 15% special chars (OCR best practice)
   output_dir: "dataset"
+
+input:
+  text_file: "input/raw_text/text.txt"
+  special_file: "input/raw_text/special.txt"
 
 text_processing:
   max_line_length_text: 100
