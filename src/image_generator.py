@@ -124,21 +124,72 @@ class OCRImageGenerator:
             f"Loaded {len(self.font_files)} fonts: {[f.name for f in self.font_files]}"
         )
 
+    def _infer_font_style_from_name(self, family_style_name: str) -> str:
+        """Infer style from a font's style name string."""
+        name = family_style_name.lower()
+        has_bold = "bold" in name
+        has_italic = "italic" in name or "oblique" in name
+        if has_bold and has_italic:
+            return "bold_italic"
+        if has_bold:
+            return "bold"
+        if has_italic:
+            return "italic"
+        return "regular"
+
+    def _infer_font_style_from_filename(self, font_path: Path) -> str:
+        """Infer style from the font file name when metadata is unavailable."""
+        filename = font_path.name.lower()
+        # Normalize common joined variants
+        if "bolditalic" in filename or "bold_italic" in filename or "bi" in filename:
+            return "bold_italic"
+        if "bold" in filename:
+            return "bold"
+        if (
+            "italic" in filename
+            or "oblique" in filename
+            or filename.endswith("i.ttf")
+            or filename.endswith("i.otf")
+        ):
+            return "italic"
+        # Many files explicitly include "regular"; otherwise default to regular
+        return "regular"
+
+    def _infer_font_style(self, font_path: Path) -> str:
+        """Infer font style using font metadata if possible, otherwise filename."""
+        try:
+            font = ImageFont.truetype(str(font_path), 12)
+            family, style = font.getname()
+            return self._infer_font_style_from_name(style)
+        except Exception:
+            return self._infer_font_style_from_filename(font_path)
+
     def _save_font_index(self):
         """Save font index mapping to JSON"""
-        font_mapping = {
-            f"f{idx:02d}": {
-                "font_file": Path(font_path).name,
+        font_mapping = {}
+        style_counts = {"regular": 0, "bold": 0, "italic": 0, "bold_italic": 0}
+        for font_path_str, idx in self.font_to_index.items():
+            font_path = Path(font_path_str)
+            style = self._infer_font_style(font_path)
+            style_counts[style] = style_counts.get(style, 0) + 1
+            font_mapping[f"f{idx:02d}"] = {
+                "font_file": font_path.name,
                 "index": idx,
+                "style": style,
             }
-            for font_path, idx in self.font_to_index.items()
-        }
 
         font_index_file = self.font_dir / "font_index.json"
         with open(font_index_file, "w", encoding="utf-8") as f:
             json.dump(font_mapping, f, indent=2, ensure_ascii=False)
 
         logger.debug(f"Font index saved to {font_index_file}")
+        logger.info(
+            "Font styles distribution - regular: %d, bold: %d, italic: %d, bold_italic: %d",
+            style_counts.get("regular", 0),
+            style_counts.get("bold", 0),
+            style_counts.get("italic", 0),
+            style_counts.get("bold_italic", 0),
+        )
 
     def _load_texts(self):
         """Load and preprocess text samples"""
