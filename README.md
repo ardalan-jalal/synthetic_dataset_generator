@@ -123,10 +123,12 @@ Synthatic_ocr_data_generator/
 ### 1. Installation
 
 **Requirements:**
-- **Python 3.10.13** (recommended)
+- **Python 3.10.13** ⚠️ **REQUIRED - This specific version is necessary for compatibility**
 - Pillow (PIL) 10.0.0+
 - NumPy 1.21.0+
 - PyYAML 6.0+
+
+> **⚠️ Important:** This project requires **Python 3.10.13** specifically. Other versions may cause compatibility issues with the dependencies (NumPy, Pillow) and may not work correctly.
 
 **Step 1: Setup Python Environment**
 
@@ -134,7 +136,13 @@ Synthatic_ocr_data_generator/
 # Navigate to project directory
 cd Synthatic_ocr_data_generator
 
-# Create virtual environment (recommended)
+# Create virtual environment with Python 3.10.13
+# Using pyenv (recommended):
+pyenv install 3.10.13  # If not already installed
+pyenv local 3.10.13    # Set for this project
+python -m venv .venv
+
+# Or specify Python 3.10.13 directly:
 python3.10 -m venv .venv
 
 # Activate virtual environment
@@ -143,6 +151,9 @@ source .venv/bin/activate
 
 # On Windows:
 .venv\Scripts\activate
+
+# Verify Python version (should show 3.10.13)
+python --version
 ```
 
 **Step 2: Install Dependencies**
@@ -347,7 +358,9 @@ PADDING = 10             # Minimum: 5-10px
 
 Instead of plain white backgrounds, your synthetic data can now have realistic paper textures that make them look like real scanned documents. This dramatically improves OCR model performance on real-world scanned documents.
 
-**Background Effects Applied:**
+**Two Background Types Available:**
+
+**1. Scanner Type (Traditional Flatbed Scanner):**
 - **Paper Texture:** Subtle grain and fiber patterns
 - **Paper Aging:** Yellowing, spots, and wear marks
 - **Scanner Artifacts:** Horizontal scan lines
@@ -355,13 +368,19 @@ Instead of plain white backgrounds, your synthetic data can now have realistic p
 - **Stains:** Random marks and discoloration
 - **Shadows:** Corner shadows for depth
 
-**Control Variables:**
-```python
-# Percentage of images to get realistic backgrounds
-BACKGROUND_AUGMENTATION_PERCENTAGE = 70  # 0-100
+**2. Phone Type (Phone Camera Scans):** 📱
+- **Grey-Blue Tint:** Characteristic cool color temperature from phone cameras
+- **Uneven Lighting:** Flash reflection and ambient light shadows
+- **Vignette Effect:** Darker corners typical of camera lens
+- **Camera Noise:** Subtle grain from phone sensor
+- **Focus Blur:** Slight blur from camera focus variation
 
-# Background intensity level
-BACKGROUND_INTENSITY = 'medium'  # 'light', 'medium', or 'heavy'
+**Control Variables (in config.yaml):**
+```yaml
+background:
+  percentage: 70              # 0-100
+  intensity: "medium"         # 'light', 'medium', or 'heavy'
+  type: "scanner"             # 'scanner' or 'phone'
 ```
 
 **Intensity Levels:**
@@ -431,17 +450,23 @@ AUGMENTATION_PERCENTAGE = 30             # Additional scan imperfections
 This combination produces highly realistic training data that performs excellently on both clean digital text and challenging scanned documents.
 
 **Testing Background Augmentation:**
-Want to see what the different intensity levels look like? Run the test script:
+Want to see what the different backgrounds look like? Run the test scripts:
+
 ```bash
+# Test traditional scanner backgrounds
 python test_background.py
+
+# Test phone scan backgrounds (grey-blue tint)
+python test_phone_background.py
 ```
 
-This creates sample images in the `test_samples/` folder showing:
+These create sample images showing:
 - Original white background
 - Light, medium, and heavy intensity backgrounds
+- Scanner vs. phone scan effects
 - Multiple variations to show randomness
 
-Compare the results to choose the best intensity level for your use case!
+Compare the results to choose the best type and intensity level for your use case!
 
 ### Text Processing
 
@@ -512,6 +537,47 @@ dataset:
 ```
 
 ## 🔧 Troubleshooting
+
+### Issue: "Wrong Python version in virtual environment"
+
+**Symptoms:**
+- `python --version` shows wrong version even after activating venv
+- Dependencies fail to install correctly
+- Compatibility errors when running the script
+
+**Solution:**
+1. Check if you have shell aliases interfering:
+```bash
+# Check for python aliases
+grep "alias.*python" ~/.zshrc ~/.bashrc
+```
+
+2. Remove any python aliases from your shell config:
+```bash
+# Edit your shell config file
+nano ~/.zshrc  # or ~/.bashrc for bash
+# Remove lines like: alias python=python3.13
+```
+
+3. Recreate the virtual environment:
+```bash
+# Remove old venv
+rm -rf .venv
+
+# Create new venv with Python 3.10.13 (full path to avoid issues)
+/path/to/python3.10 -m venv .venv
+# Or if using pyenv:
+~/.pyenv/versions/3.10.13/bin/python3.10 -m venv .venv
+
+# Activate and verify
+source .venv/bin/activate
+python --version  # Should show Python 3.10.13
+```
+
+4. Restart your terminal or reload shell config:
+```bash
+exec zsh  # or exec bash
+```
 
 ### Issue: "Not generating enough samples"
 
