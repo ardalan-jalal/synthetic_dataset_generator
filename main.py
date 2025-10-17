@@ -28,7 +28,7 @@ def main():
     """Main generation workflow"""
     try:
         # Load configuration
-        config = load_config("config/config.yaml")
+        config = load_config("config.yaml")
         config.print_summary()
 
         # Calculate samples

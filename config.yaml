@@ -10,8 +10,8 @@ dataset:
   output_dir: "dataset"
 
 input:
-  text_file: "input/raw_text/text.txt"
-  special_file: "input/raw_text/special.txt"
+  text_file: "input/text.txt"
+  special_file: "input/special.txt"
 
 text_processing:
   max_line_length_text: 100
