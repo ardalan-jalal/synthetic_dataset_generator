@@ -9,6 +9,11 @@ fonts/font_index.json
 logs/
 !logs/.gitkeep
 
+# Preprocessed text files and metadata
+input/processed/metadata.json
+input/processed/preprocessing_stats.json
+input/processed/preprocessing_stats.txt
+
 # Test samples folder
 test_samples/
 test_rotation_fix/

@@ -18,6 +18,7 @@ A Python tool for generating synthetic OCR training data optimized for Kurdish t
 
 ### Technical Features
 - ⚡ **Tesseract LSTM Optimized** - 32px text height, proper padding, sentence-aware splitting
+- 📝 **Text Preprocessing** - Optional text chunking with metadata tracking for improved training
 - 🗂️ **Smart File Management** - Sequential naming with font tracking
 - 🌐 **Kurdish/Arabic Support** - Full UTF-8 encoding with Arabic-Indic numerals
 - 📈 **Progress Tracking** - Real-time generation status with professional logging
@@ -84,6 +85,7 @@ Synthatic_ocr_data_generator/
 ├── src/                       # Source code modules (refactored!)
 │   ├── __init__.py
 │   ├── image_generator.py    # ⭐ Unified generator for text & special
+│   ├── preprocess_text.py    # Text preprocessing with metadata
 │   ├── augmentation.py       # ⭐ Image augmentation functions
 │   ├── text_processing.py    # ⭐ Text splitting utilities
 │   ├── background_augmentation.py  # Realistic paper backgrounds
@@ -223,6 +225,22 @@ See `config/CONFIG_GUIDE.md` for all options!
 
 ```bash
 # Run the main controller (generates both text and special)
+python main.py
+```
+
+**Optional: Text Preprocessing**
+
+For improved chunk tracking and metadata (recommended for large datasets):
+
+```bash
+# 1. Preprocess raw text (one-time setup)
+python -m src.preprocess_text
+
+# 2. Enable in config.yaml
+input:
+  use_preprocessed: true
+
+# 3. Generate images
 python main.py
 ```
 

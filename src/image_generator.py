@@ -43,13 +43,23 @@ class OCRImageGenerator:
 
         # Input file selection
         if self.mode == "text":
-            self.input_file = Path(self.config.input.text_file)
+            # Use preprocessed files if enabled
+            if (
+                hasattr(self.config.input, "use_preprocessed")
+                and self.config.input.use_preprocessed
+            ):
+                self.input_file = Path(self.config.input.processed_dir) / "text.txt"
+                self.use_metadata = True
+            else:
+                self.input_file = Path(self.config.input.text_file)
+                self.use_metadata = False
             self.max_line_length = self.config.text_processing.max_line_length_text
             self.prefix = "t"  # Text prefix
         else:
             self.input_file = Path(self.config.input.special_file)
             self.max_line_length = self.config.text_processing.max_line_length_special
             self.prefix = "s"  # Special prefix
+            self.use_metadata = False
 
         # Load configuration
         self._load_settings()
@@ -58,6 +68,7 @@ class OCRImageGenerator:
         self.font_files = []
         self.font_to_index = {}
         self.texts = []
+        self.text_metadata = []  # Metadata for chunk tracking
         self.generated_combinations = set()
 
     def _load_settings(self):
@@ -208,6 +219,29 @@ class OCRImageGenerator:
         if not raw_texts:
             raise ValueError(f"No valid text found in {self.input_file}")
 
+        # If using preprocessed files, load metadata
+        if self.use_metadata:
+            metadata_file = Path(self.config.input.processed_dir) / "metadata.json"
+            if metadata_file.exists():
+                with open(metadata_file, "r", encoding="utf-8") as f:
+                    metadata_list = json.load(f)
+                # Store metadata indexed by chunk_id
+                self.text_metadata = {m["chunk_id"]: m for m in metadata_list}
+                self.texts = raw_texts  # Already chunked
+                logger.info(
+                    f"Loaded {len(raw_texts)} preprocessed chunks with metadata"
+                )
+            else:
+                logger.warning(
+                    f"Metadata file not found at {metadata_file}, using default chunking"
+                )
+                self.use_metadata = False
+                self._load_texts_default(raw_texts)
+        else:
+            self._load_texts_default(raw_texts)
+
+    def _load_texts_default(self, raw_texts):
+        """Load texts with default splitting (no metadata)"""
         # Split long lines
         self.texts = []
         for text in raw_texts:
@@ -331,8 +365,13 @@ class OCRImageGenerator:
         if should_apply_background:
             img = apply_realistic_background(img, intensity=self.background_intensity)
 
+        # Determine chunk number (from metadata if available, otherwise default to 01)
+        chunk_num = 1  # Default
+        if self.use_metadata and counter in self.text_metadata:
+            chunk_num = self.text_metadata[counter]["chunk_num"]
+
         # Save image and ground truth
-        filename = f"{prefix}{counter:04d}c01f{font_index:02d}"
+        filename = f"{prefix}{counter:04d}c{chunk_num:02d}f{font_index:02d}"
         img_path = self.output_dir / f"{filename}.tif"
         gt_path = self.output_dir / f"{filename}.gt.txt"
 

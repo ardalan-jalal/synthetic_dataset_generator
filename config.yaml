@@ -6,16 +6,32 @@
 
 dataset:
   total_samples: 100         # Large production dataset
-  text_percentage: 85           # 85% text, 15% special chars (OCR best practice)
+  text_percentage: 95           # 85% text, 15% special chars (OCR best practice)
   output_dir: "dataset"
 
 input:
-  text_file: "input/text.txt"
+  # Raw text files (unprocessed)
+  raw_text_dir: "input/raw_text"
+  
+  # Processed text files (after preprocessing)
+  processed_dir: "input/processed"
+  
+  # Active text files used by image generator
+  text_file: "input/text.txt"           # Current: uses existing text.txt
   special_file: "input/special.txt"
+  
+  # Set to true to use preprocessed files instead
+  use_preprocessed: true                # Run preprocess_text.py first if true
+
+preprocessing:
+  enabled: false                         # Set to true to preprocess raw text before generation
+  auto_run: false                        # Automatically run preprocessing if processed files missing
+  save_stats: true                       # Save detailed preprocessing statistics
+  overwrite_existing: false              # Overwrite existing preprocessed files
 
 text_processing:
-  max_line_length_text: 100
-  max_line_length_special: 50
+  max_line_length_text: 80               # Optimal for Tesseract LSTM (~720px)
+  max_line_length_special: 80            # Half of text length
 
 fonts:
   directory: "fonts"
