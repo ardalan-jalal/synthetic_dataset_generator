@@ -5,8 +5,8 @@
 # Optimized for real-world OCR training with realistic documents
 
 dataset:
-  total_samples: 100         # Large production dataset
-  text_percentage: 95           # 85% text, 15% special chars (OCR best practice)
+  total_samples: 100000         # Large production dataset
+  text_percentage: 98           # 85% text, 15% special chars (OCR best practice)
   output_dir: "dataset"
 
 input:
@@ -24,10 +24,10 @@ input:
   use_preprocessed: true                # Run preprocess_text.py first if true
 
 preprocessing:
-  enabled: false                         # Set to true to preprocess raw text before generation
-  auto_run: false                        # Automatically run preprocessing if processed files missing
-  save_stats: false                       # Save detailed preprocessing statistics
-  overwrite_existing: false              # Overwrite existing preprocessed files
+  enabled: true                         # Set to true to preprocess raw text before generation
+  auto_run: true                        # Automatically run preprocessing if processed files missing
+  save_stats: true                       # Save detailed preprocessing statistics
+  overwrite_existing: true              # Overwrite existing preprocessed files
 
 text_processing:
   max_line_length_text: 80               # Optimal for Tesseract LSTM (~720px)

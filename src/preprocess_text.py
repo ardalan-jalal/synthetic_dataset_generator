@@ -122,14 +122,15 @@ class TextPreprocessor:
         logger.info(f"Processing {text_file.name}...")
 
         with open(text_file, "r", encoding="utf-8") as f:
-            raw_lines = f.readlines()
+            lines = f.readlines()
 
         # Filter empty lines and remove invisible characters
-        raw_lines = [
-            remove_invisible_characters(line.strip())
-            for line in raw_lines
-            if line.strip()
-        ]
+        raw_lines = []
+        for line in lines:
+            cleaned = remove_invisible_characters(line.strip())
+            # Only add non-empty lines after cleaning
+            if cleaned and cleaned.strip():
+                raw_lines.append(cleaned)
 
         chunks = []
         metadata = []
@@ -138,6 +139,8 @@ class TextPreprocessor:
         for line_idx, raw_line in enumerate(raw_lines):
             # Split line into chunks
             line_chunks = split_long_lines(raw_line, self.max_chars_text)
+            # Filter out empty chunks (can happen after removing invisible chars)
+            line_chunks = [chunk for chunk in line_chunks if chunk and chunk.strip()]
 
             # Track chunk distribution
             num_chunks = len(line_chunks)

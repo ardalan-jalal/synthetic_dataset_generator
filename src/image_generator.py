@@ -214,11 +214,12 @@ class OCRImageGenerator:
             lines = f.readlines()
 
         # Filter empty lines and remove invisible characters
-        raw_texts = [
-            remove_invisible_characters(line.strip())
-            for line in lines
-            if line.strip()
-        ]
+        raw_texts = []
+        for line in lines:
+            cleaned = remove_invisible_characters(line.strip())
+            # Only add non-empty lines after cleaning
+            if cleaned and cleaned.strip():
+                raw_texts.append(cleaned)
 
         if not raw_texts:
             raise ValueError(f"No valid text found in {self.input_file}")
@@ -249,11 +250,20 @@ class OCRImageGenerator:
         # Split long lines
         self.texts = []
         for text in raw_texts:
-            self.texts.extend(split_long_lines(text, self.max_line_length))
+            chunks = split_long_lines(text, self.max_line_length)
+            # Filter out empty chunks (can happen after removing invisible chars)
+            self.texts.extend([chunk for chunk in chunks if chunk and chunk.strip()])
 
         logger.info(
             f"Loaded {len(raw_texts)} lines, expanded to {len(self.texts)} samples after splitting"
         )
+        
+        if not self.texts:
+            raise ValueError(
+                "No valid text samples found after processing. "
+                "Check if input files contain valid text or if invisible character removal "
+                "is removing all content."
+            )
 
     def generate(self, num_images: int) -> dict:
         """
@@ -289,6 +299,12 @@ class OCRImageGenerator:
                 # Select text and font
                 text_index = shuffled_indices[stats["successful"] % len(self.texts)]
                 text = self.texts[text_index]
+                
+                # Skip if text is empty (shouldn't happen, but double-check)
+                if not text or not text.strip():
+                    stats["skipped_duplicates"] += 1
+                    continue
+                
                 font_path = random.choice(self.font_files)
                 font_index = self.font_to_index[str(font_path)]
 
@@ -337,6 +353,10 @@ class OCRImageGenerator:
         """Generate a single image with ground truth and character boxes"""
         # Remove invisible characters from text before processing
         text = remove_invisible_characters(text)
+        
+        # Validate: Skip empty strings (can happen after removing invisible chars)
+        if not text or not text.strip():
+            raise ValueError("Empty text string after processing - skipping")
         
         # Calculate optimal font size
         optimal_font_size = self._get_optimal_font_size(font_path, text)
