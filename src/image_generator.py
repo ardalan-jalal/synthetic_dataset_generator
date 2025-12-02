@@ -330,7 +330,7 @@ class OCRImageGenerator:
     def _generate_single_image(
         self, text: str, font_path: Path, font_index: int, counter: int
     ):
-        """Generate a single image with ground truth"""
+        """Generate a single image with ground truth and character boxes"""
         # Calculate optimal font size
         optimal_font_size = self._get_optimal_font_size(font_path, text)
         font = ImageFont.truetype(str(font_path), optimal_font_size)
@@ -339,6 +339,16 @@ class OCRImageGenerator:
         bbox = font.getbbox(text)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
+
+        # Handle edge case: if text_width is 0 (e.g., only spaces), use minimum width
+        if text_width == 0:
+            text_width = len(text) * (
+                font.size // 4
+            )  # Estimate based on character count
+
+        # Handle edge case: if text_height is 0, use font size
+        if text_height == 0:
+            text_height = font.size
 
         img_width = text_width + (self.padding * 2)
         img_height = max(
@@ -350,6 +360,16 @@ class OCRImageGenerator:
         img = Image.new("RGB", (img_width, img_height), color=(255, 255, 255))
         draw = ImageDraw.Draw(img)
         y_offset = (img_height - text_height) // 2 - bbox[1]
+
+        # Compute character boxes BEFORE augmentation/background
+        # For RTL text, PIL renders starting at self.padding and extends rightward
+        # The rightmost position is self.padding + text_width
+        x_end = self.padding + text_width  # Rightmost position for RTL
+        character_boxes = self._compute_character_boxes_rtl(
+            text, font, x_end, y_offset, img_height
+        )
+
+        # Render text
         draw.text((self.padding, y_offset), text, fill=(0, 0, 0), font=font)
 
         # Apply augmentations
@@ -370,15 +390,21 @@ class OCRImageGenerator:
         if self.use_metadata and counter in self.text_metadata:
             chunk_num = self.text_metadata[counter]["chunk_num"]
 
-        # Save image and ground truth
+        # Save image, ground truth, and box file
         filename = f"{prefix}{counter:04d}c{chunk_num:02d}f{font_index:02d}"
         img_path = self.output_dir / f"{filename}.tif"
         gt_path = self.output_dir / f"{filename}.gt.txt"
+        box_path = self.output_dir / f"{filename}.box"
 
         img.save(str(img_path), dpi=(300, 300))
 
         with open(gt_path, "w", encoding="utf-8") as f:
             f.write(text)
+
+        # Write .box file in Tesseract format: <char> left bottom right top 0
+        with open(box_path, "w", encoding="utf-8") as f:
+            for char, left, bottom, right, top in character_boxes:
+                f.write(f"{char} {left} {bottom} {right} {top} 0\n")
 
     def _get_optimal_font_size(self, font_path: Path, sample_text: str) -> int:
         """Calculate font size that produces text close to target height"""
@@ -389,3 +415,153 @@ class OCRImageGenerator:
             if text_height >= self.target_text_height:
                 return size
         return 32  # Default fallback
+
+    def _compute_character_boxes_rtl(
+        self,
+        text: str,
+        font: ImageFont.FreeTypeFont,
+        x_end: int,
+        y_offset: int,
+        img_height: int,
+    ) -> List[Tuple[str, int, int, int, int]]:
+        """
+        Compute character-level bounding boxes for RTL text.
+
+        For RTL text, PIL renders from right to left. The x_end parameter is where
+        the text ends (rightmost position), and text extends leftward from there.
+
+        Args:
+            text: The text string
+            font: PIL ImageFont object
+            x_end: Rightmost x position where RTL text ends (self.padding)
+            y_offset: Y offset for text baseline
+            img_height: Image height for coordinate conversion
+
+        Returns:
+            List of tuples: (char, left, bottom, right, top) in Tesseract format
+            Coordinates are in Tesseract format (bottom-left origin)
+            Spaces are skipped (no box entry)
+        """
+        boxes = []
+
+        # Create a temporary image and draw context for accurate measurements
+        temp_img = Image.new("RGB", (2000, 200), color=(255, 255, 255))
+        temp_draw = ImageDraw.Draw(temp_img)
+
+        # For RTL text, the rendering position (x_end) is where text ENDS
+        # We need to find where text STARTS (leftmost position)
+        full_bbox = temp_draw.textbbox((0, 0), text, font=font)
+        text_width = full_bbox[2] - full_bbox[0]
+        x_start = x_end - text_width  # Leftmost position where text starts
+
+        # Process characters from right to left (RTL)
+        # Build text progressively from the end, measuring cumulative positions
+        suffix = ""
+        x_pos = x_end  # Start from rightmost position
+
+        for char in reversed(text):
+            if char == " ":
+                # For spaces, measure width and create a box entry
+                # Spaces don't render a visible glyph but still need box entries
+                with_space = " " + suffix
+                bbox_with = temp_draw.textbbox((0, 0), with_space, font=font)
+                width_with = bbox_with[2] - bbox_with[0]
+
+                bbox_without = (
+                    temp_draw.textbbox((0, 0), suffix, font=font)
+                    if suffix
+                    else (0, 0, 0, 0)
+                )
+                width_without = bbox_without[2] - bbox_without[0]
+
+                space_width = width_with - width_without
+                if space_width <= 0:
+                    space_width = max(1, font.size // 4)
+
+                # For spaces, create a box entry (no visible glyph, but still in .box file)
+                # Use the same vertical bounds as surrounding text
+                # Get baseline and typical character height for spacing
+                char_bbox = temp_draw.textbbox(
+                    (0, 0), "ا", font=font
+                )  # Use a typical character for height
+                char_top = char_bbox[1]
+                char_bottom = char_bbox[3]
+
+                # Space box: ends at x_pos, starts at x_pos - space_width
+                space_right = x_pos
+                space_left = x_pos - space_width
+
+                # PIL coordinates (top-left origin)
+                pil_top = y_offset + char_top
+                pil_bottom = y_offset + char_bottom
+
+                # Convert to Tesseract coordinates (bottom-left origin)
+                tesseract_left = space_left
+                tesseract_bottom = img_height - pil_bottom
+                tesseract_right = space_right
+                tesseract_top = img_height - pil_top
+
+                # Ensure coordinates are valid
+                tesseract_left = max(0, int(tesseract_left))
+                tesseract_bottom = max(0, int(tesseract_bottom))
+                tesseract_right = max(tesseract_left + 1, int(tesseract_right))
+                tesseract_top = max(tesseract_bottom + 1, int(tesseract_top))
+
+                boxes.append(
+                    (
+                        " ",  # Space character
+                        tesseract_left,
+                        tesseract_bottom,
+                        tesseract_right,
+                        tesseract_top,
+                    )
+                )
+
+                # Advance position leftward (for RTL)
+                x_pos = space_left
+                suffix = with_space
+            else:
+                # Measure this character's position
+                char_text = char + suffix
+                char_bbox = temp_draw.textbbox((0, 0), char, font=font)
+                char_width = char_bbox[2] - char_bbox[0]
+                char_top = char_bbox[1]
+                char_bottom = char_bbox[3]
+
+                # For RTL, character ends at x_pos, starts at x_pos - char_width
+                char_right = x_pos
+                char_left = x_pos - char_width
+
+                # PIL coordinates (top-left origin)
+                pil_top = y_offset + char_top
+                pil_bottom = y_offset + char_bottom
+
+                # Convert to Tesseract coordinates (bottom-left origin)
+                tesseract_left = char_left
+                tesseract_bottom = img_height - pil_bottom
+                tesseract_right = char_right
+                tesseract_top = img_height - pil_top
+
+                # Ensure coordinates are valid
+                tesseract_left = max(0, int(tesseract_left))
+                tesseract_bottom = max(0, int(tesseract_bottom))
+                tesseract_right = max(tesseract_left + 1, int(tesseract_right))
+                tesseract_top = max(tesseract_bottom + 1, int(tesseract_top))
+
+                boxes.append(
+                    (
+                        char,
+                        tesseract_left,
+                        tesseract_bottom,
+                        tesseract_right,
+                        tesseract_top,
+                    )
+                )
+
+                # Move position left for next character (RTL)
+                x_pos = char_left
+                suffix = char_text
+
+        # Reverse to match text order (we processed RTL, but .box should match .gt.txt)
+        boxes.reverse()
+        return boxes
