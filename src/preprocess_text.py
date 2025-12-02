@@ -14,7 +14,7 @@ from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 
 from src.config_loader import load_config
-from src.text_processing import split_long_lines
+from src.text_processing import split_long_lines, remove_invisible_characters
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,12 @@ class TextPreprocessor:
         with open(text_file, "r", encoding="utf-8") as f:
             raw_lines = f.readlines()
 
-        # Filter empty lines
-        raw_lines = [line.strip() for line in raw_lines if line.strip()]
+        # Filter empty lines and remove invisible characters
+        raw_lines = [
+            remove_invisible_characters(line.strip())
+            for line in raw_lines
+            if line.strip()
+        ]
 
         chunks = []
         metadata = []

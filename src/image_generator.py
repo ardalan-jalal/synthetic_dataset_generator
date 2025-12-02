@@ -14,7 +14,7 @@ from typing import List, Tuple, Optional
 from src.config_loader import get_config
 from src.background_augmentation import apply_realistic_background
 from src.augmentation import augment_image
-from src.text_processing import split_long_lines
+from src.text_processing import split_long_lines, remove_invisible_characters
 
 
 logger = logging.getLogger(__name__)
@@ -213,8 +213,12 @@ class OCRImageGenerator:
         with open(self.input_file, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
-        # Filter empty lines
-        raw_texts = [line.strip() for line in lines if line.strip()]
+        # Filter empty lines and remove invisible characters
+        raw_texts = [
+            remove_invisible_characters(line.strip())
+            for line in lines
+            if line.strip()
+        ]
 
         if not raw_texts:
             raise ValueError(f"No valid text found in {self.input_file}")
@@ -331,6 +335,9 @@ class OCRImageGenerator:
         self, text: str, font_path: Path, font_index: int, counter: int
     ):
         """Generate a single image with ground truth and character boxes"""
+        # Remove invisible characters from text before processing
+        text = remove_invisible_characters(text)
+        
         # Calculate optimal font size
         optimal_font_size = self._get_optimal_font_size(font_path, text)
         font = ImageFont.truetype(str(font_path), optimal_font_size)
