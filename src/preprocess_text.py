@@ -125,12 +125,21 @@ class TextPreprocessor:
             lines = f.readlines()
 
         # Filter empty lines and remove invisible characters
+        # This ensures no empty strings enter the processing pipeline
         raw_lines = []
         for line in lines:
-            cleaned = remove_invisible_characters(line.strip())
-            # Only add non-empty lines after cleaning
+            # Strip whitespace first
+            stripped = line.strip()
+            # Skip completely empty lines
+            if not stripped:
+                continue
+            # Remove invisible characters
+            cleaned = remove_invisible_characters(stripped)
+            # Only add non-empty lines after cleaning (double-check)
             if cleaned and cleaned.strip():
                 raw_lines.append(cleaned)
+            else:
+                logger.debug(f"Skipped empty line after cleaning: {repr(line[:50])}")
 
         chunks = []
         metadata = []
@@ -182,13 +191,34 @@ class TextPreprocessor:
     ):
         """Save processed chunks, metadata, and statistics"""
 
-        # Save chunked text
+        # Final filter: Remove any empty strings that might have slipped through
+        # This ensures the processed text file contains only valid, non-empty chunks
+        valid_chunks = [chunk for chunk in chunks if chunk and chunk.strip()]
+
+        # Update metadata to match valid chunks only
+        if len(valid_chunks) != len(chunks):
+            logger.warning(
+                f"Filtered out {len(chunks) - len(valid_chunks)} empty chunks before saving"
+            )
+            # Rebuild metadata to match valid chunks (keep only metadata for valid chunks)
+            valid_metadata = []
+            for i, chunk in enumerate(chunks):
+                if chunk and chunk.strip():  # This chunk is valid
+                    if i < len(metadata):
+                        valid_metadata.append(metadata[i])
+            metadata = valid_metadata
+            # Update stats to reflect actual saved chunks
+            stats["total_chunks"] = len(valid_chunks)
+
+        # Save chunked text - only non-empty chunks
         text_output = self.processed_dir / "text.txt"
         with open(text_output, "w", encoding="utf-8") as f:
-            for chunk in chunks:
+            for chunk in valid_chunks:
                 f.write(chunk + "\n")
 
-        logger.info(f"Saved {len(chunks)} chunks to {text_output}")
+        logger.info(
+            f"Saved {len(valid_chunks)} chunks to {text_output} (filtered {len(chunks) - len(valid_chunks)} empty chunks)"
+        )
 
         # Save metadata
         metadata_output = self.processed_dir / "metadata.json"
