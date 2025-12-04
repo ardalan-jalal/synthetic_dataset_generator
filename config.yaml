@@ -6,7 +6,7 @@
 
 dataset:
   total_samples: 100000         # Large production dataset
-  text_percentage: 98           # 85% text, 15% special chars (OCR best practice)
+  text_percentage: 100           # 85% text, 15% special chars (OCR best practice)
   output_dir: "dataset"
 
 input:
@@ -28,6 +28,7 @@ preprocessing:
   auto_run: true                        # Automatically run preprocessing if processed files missing
   save_stats: true                       # Save detailed preprocessing statistics
   overwrite_existing: true              # Overwrite existing preprocessed files
+  filter_invalid_chars: true            # Filter chunks containing characters not in char_map.json
 
 text_processing:
   max_line_length_text: 80               # Optimal for Tesseract LSTM (~720px)

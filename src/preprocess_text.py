@@ -39,9 +39,31 @@ class TextPreprocessor:
         if hasattr(config, "preprocessing"):
             self.save_stats = config.preprocessing.save_stats
             self.overwrite = config.preprocessing.overwrite_existing
+            self.filter_invalid_chars = getattr(
+                config.preprocessing, "filter_invalid_chars", False
+            )
         else:
             self.save_stats = True
             self.overwrite = False
+            self.filter_invalid_chars = False
+
+        # Load valid characters from char_map.json if filtering is enabled
+        self.valid_chars = None
+        if self.filter_invalid_chars:
+            char_map_path = self.raw_text_dir / "char_map.json"
+            if char_map_path.exists():
+                with open(char_map_path, "r", encoding="utf-8") as f:
+                    char_map = json.load(f)
+                # Extract all valid characters from char_map
+                self.valid_chars = set(entry["char"] for entry in char_map.values())
+                logger.info(
+                    f"Loaded {len(self.valid_chars)} valid characters from char_map.json"
+                )
+            else:
+                logger.warning(
+                    f"char_map.json not found at {char_map_path}, disabling character filtering"
+                )
+                self.filter_invalid_chars = False
 
     def preprocess_text_files(self) -> Dict:
         """
@@ -81,6 +103,7 @@ class TextPreprocessor:
             "total_raw_lines": 0,
             "total_chunks": 0,
             "chunk_distribution": {},
+            "total_filtered_chunks": 0,
         }
 
         for text_file in text_files:
@@ -91,6 +114,7 @@ class TextPreprocessor:
             all_metadata.extend(metadata)
 
             stats["total_raw_lines"] += file_stats["raw_lines"]
+            stats["total_filtered_chunks"] += file_stats.get("filtered_chunks", 0)
 
             # Update chunk distribution
             for num_chunks, count in file_stats["chunk_counts"].items():
@@ -145,15 +169,27 @@ class TextPreprocessor:
         metadata = []
         chunk_counts = {}
 
+        filtered_count = 0
         for line_idx, raw_line in enumerate(raw_lines):
             # Split line into chunks
             line_chunks = split_long_lines(raw_line, self.max_chars_text)
             # Filter out empty chunks (can happen after removing invisible chars)
             line_chunks = [chunk for chunk in line_chunks if chunk and chunk.strip()]
 
+            # Filter chunks with invalid characters if enabled
+            if self.filter_invalid_chars and self.valid_chars:
+                original_count = len(line_chunks)
+                line_chunks = [
+                    chunk
+                    for chunk in line_chunks
+                    if all(char in self.valid_chars for char in chunk)
+                ]
+                filtered_count += original_count - len(line_chunks)
+
             # Track chunk distribution
             num_chunks = len(line_chunks)
-            chunk_counts[num_chunks] = chunk_counts.get(num_chunks, 0) + 1
+            if num_chunks > 0:
+                chunk_counts[num_chunks] = chunk_counts.get(num_chunks, 0) + 1
 
             # Add chunks and metadata
             for chunk_num, chunk in enumerate(line_chunks, start=1):
@@ -178,11 +214,16 @@ class TextPreprocessor:
             "raw_lines": len(raw_lines),
             "chunks": len(chunks),
             "chunk_counts": chunk_counts,
+            "filtered_chunks": filtered_count if self.filter_invalid_chars else 0,
         }
 
         logger.info(
             f"  {text_file.name}: {stats['raw_lines']} lines → {stats['chunks']} chunks"
         )
+        if self.filter_invalid_chars and filtered_count > 0:
+            logger.info(
+                f"  Filtered out {filtered_count} chunks with invalid characters"
+            )
 
         return chunks, metadata, stats
 
@@ -243,6 +284,10 @@ class TextPreprocessor:
             f.write(f"Total files processed: {stats['total_files']}\n")
             f.write(f"Total raw lines: {stats['total_raw_lines']}\n")
             f.write(f"Total chunks created: {stats['total_chunks']}\n")
+            if stats.get("total_filtered_chunks", 0) > 0:
+                f.write(
+                    f"Chunks filtered (invalid chars): {stats['total_filtered_chunks']}\n"
+                )
             f.write(
                 f"Expansion factor: {stats['total_chunks'] / stats['total_raw_lines']:.2f}x\n\n"
             )
@@ -278,6 +323,10 @@ class TextPreprocessor:
         print(f"Files processed: {stats['total_files']}")
         print(f"Raw lines: {stats['total_raw_lines']:,}")
         print(f"Chunks created: {stats['total_chunks']:,}")
+        if stats.get("total_filtered_chunks", 0) > 0:
+            print(
+                f"Chunks filtered (invalid chars): {stats['total_filtered_chunks']:,}"
+            )
         print(f"Expansion: {stats['total_chunks'] / stats['total_raw_lines']:.2f}x\n")
 
         print("Chunk Distribution:")
