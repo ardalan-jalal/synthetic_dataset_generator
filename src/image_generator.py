@@ -54,11 +54,11 @@ class OCRImageGenerator:
                 self.input_file = Path(self.config.input.text_file)
                 self.use_metadata = False
             self.max_line_length = self.config.text_processing.max_line_length_text
-            self.prefix = "t"  # Text prefix
+            self.prefix = ""  # No prefix needed
         else:
             self.input_file = Path(self.config.input.special_file)
             self.max_line_length = self.config.text_processing.max_line_length_special
-            self.prefix = "s"  # Special prefix
+            self.prefix = ""  # No prefix needed
             self.use_metadata = False
 
         # Load configuration
@@ -428,7 +428,7 @@ class OCRImageGenerator:
             img = augment_image(img)
             prefix = "a"  # Augmented
         else:
-            prefix = self.prefix  # Original prefix (t or s)
+            prefix = self.prefix  # No prefix (empty string)
 
         # Apply background
         should_apply_background = random.random() * 100 < self.background_percentage
