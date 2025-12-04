@@ -70,6 +70,7 @@ class OCRImageGenerator:
         self.texts = []
         self.text_metadata = []  # Metadata for chunk tracking
         self.generated_combinations = set()
+        self.current_font_index = 0  # Round-robin font selection counter
 
     def _load_settings(self):
         """Load all settings from config"""
@@ -130,6 +131,9 @@ class OCRImageGenerator:
 
         # Save font index
         self._save_font_index()
+
+        # Initialize round-robin font counter for equal distribution
+        self.current_font_index = 0
 
         logger.info(
             f"Loaded {len(self.font_files)} fonts: {[f.name for f in self.font_files]}"
@@ -257,13 +261,31 @@ class OCRImageGenerator:
         logger.info(
             f"Loaded {len(raw_texts)} lines, expanded to {len(self.texts)} samples after splitting"
         )
-        
+
         if not self.texts:
             raise ValueError(
                 "No valid text samples found after processing. "
                 "Check if input files contain valid text or if invisible character removal "
                 "is removing all content."
             )
+
+    def _select_font_equal_distribution(self) -> Tuple[Path, int]:
+        """
+        Select a font using round-robin to ensure equal distribution.
+        Each font will be used exactly (total_images / num_fonts) times.
+
+        Returns:
+            Tuple of (font_path, font_index)
+        """
+        # Round-robin: cycle through fonts in order
+        font_path = self.font_files[self.current_font_index]
+        font_index = self.font_to_index[str(font_path)]
+
+        return font_path, font_index
+
+    def _advance_font_index(self):
+        """Advance to the next font in round-robin cycle"""
+        self.current_font_index = (self.current_font_index + 1) % len(self.font_files)
 
     def generate(self, num_images: int) -> dict:
         """
@@ -299,14 +321,14 @@ class OCRImageGenerator:
                 # Select text and font
                 text_index = shuffled_indices[stats["successful"] % len(self.texts)]
                 text = self.texts[text_index]
-                
+
                 # Skip if text is empty (shouldn't happen, but double-check)
                 if not text or not text.strip():
                     stats["skipped_duplicates"] += 1
                     continue
-                
-                font_path = random.choice(self.font_files)
-                font_index = self.font_to_index[str(font_path)]
+
+                # Select font with equal distribution
+                font_path, font_index = self._select_font_equal_distribution()
 
                 # Check for duplicates
                 combination = (text_index, font_index)
@@ -322,8 +344,9 @@ class OCRImageGenerator:
                     counter=stats["successful"],
                 )
 
-                # Mark as generated
+                # Mark as generated and advance to next font (round-robin)
                 self.generated_combinations.add(combination)
+                self._advance_font_index()
                 stats["successful"] += 1
 
                 # Progress update
@@ -353,11 +376,11 @@ class OCRImageGenerator:
         """Generate a single image with ground truth and character boxes"""
         # Remove invisible characters from text before processing
         text = remove_invisible_characters(text)
-        
+
         # Validate: Skip empty strings (can happen after removing invisible chars)
         if not text or not text.strip():
             raise ValueError("Empty text string after processing - skipping")
-        
+
         # Calculate optimal font size
         optimal_font_size = self._get_optimal_font_size(font_path, text)
         font = ImageFont.truetype(str(font_path), optimal_font_size)
