@@ -5,7 +5,7 @@
 # Optimized for real-world OCR training with realistic documents
 
 dataset:
-  total_samples: 100000         # Large production dataset
+  total_samples: 200         # Large production dataset
   text_percentage: 100           # 85% text, 15% special chars (OCR best practice)
   output_dir: "dataset"
 
@@ -40,43 +40,43 @@ fonts:
   padding: 10
 
 augmentation:
-  enabled: true
-  percentage: 40                # Balanced augmentation for production
+  enabled: false
+  percentage: 0                # Balanced augmentation for production
 
   rotation:
-    enabled: true
-    probability: 0.7            # Most scanned docs have slight rotation
-    angle_range: [-2, 2]
+    enabled: false
+    probability: 0            # Most scanned docs have slight rotation
+    angle_range: [0, 0]
 
   noise:
-    enabled: true
-    probability: 0.5
-    level: 0.01
+    enabled: false
+    probability: 0
+    level: 0
 
   blur:
-    enabled: true
-    probability: 0.5
-    radius_range: [0.5, 0.8]
+    enabled: false
+    probability: 0
+    radius_range: [0, 0]
 
   brightness:
-    enabled: true
-    probability: 0.6
-    factor_range: [0.88, 1.12]
+    enabled: false
+    probability: 0
+    factor_range: [0, 0]
 
   contrast:
-    enabled: true
-    probability: 0.4
-    factor_range: [0.9, 1.1]
+    enabled: false
+    probability: 0
+    factor_range: [0, 0]
 
 background:
-  enabled: true
-  percentage: 70                # 70% realistic backgrounds (recommended)
+  enabled: false
+  percentage: 0                # 70% realistic backgrounds (recommended)
   intensity: "medium"           # Best for general-purpose OCR
 
 output:
   format: "tif"
   dpi: 300
-  progress_interval: 100        # Progress every 100 images
+  progress_interval: 1000        # Progress every 100 images
 
 advanced:
   duplicate_prevention: true
