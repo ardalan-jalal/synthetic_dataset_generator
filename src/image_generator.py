@@ -571,12 +571,33 @@ class OCRImageGenerator:
                 x_pos = space_left
                 suffix = with_space
             else:
-                # Measure this character's position
+                # Measure this character's position in context (important for RTL contextual shaping)
                 char_text = char + suffix
-                char_bbox = temp_draw.textbbox((0, 0), char, font=font)
-                char_width = char_bbox[2] - char_bbox[0]
-                char_top = char_bbox[1]
-                char_bottom = char_bbox[3]
+
+                # Measure width with this character
+                bbox_with_char = temp_draw.textbbox((0, 0), char_text, font=font)
+                width_with_char = bbox_with_char[2] - bbox_with_char[0]
+
+                # Measure width without this character (just suffix)
+                bbox_without_char = (
+                    temp_draw.textbbox((0, 0), suffix, font=font)
+                    if suffix
+                    else (0, 0, 0, 0)
+                )
+                width_without_char = bbox_without_char[2] - bbox_without_char[0]
+
+                # Character width in context
+                char_width = width_with_char - width_without_char
+                if char_width <= 0:
+                    # Fallback: measure character in isolation
+                    char_bbox = temp_draw.textbbox((0, 0), char, font=font)
+                    char_width = char_bbox[2] - char_bbox[0]
+                    char_top = char_bbox[1]
+                    char_bottom = char_bbox[3]
+                else:
+                    # Use the bbox with character for vertical bounds
+                    char_top = bbox_with_char[1]
+                    char_bottom = bbox_with_char[3]
 
                 # For RTL, character ends at x_pos, starts at x_pos - char_width
                 char_right = x_pos
